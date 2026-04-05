@@ -1,0 +1,22 @@
+# docker volumes
+*/data/
+*/volumes/
+
+# logs
+*.log
+
+# system
+.DS_Store
+Thumbs.db
+
+# vagrant
+.vagrant/
+
+# env
+.env
+
+# docker
+**/positions.yml
+
+# cache
+__pycache__/
