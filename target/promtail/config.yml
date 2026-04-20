@@ -3,7 +3,7 @@ server:
   grpc_listen_port: 0
 
 positions:
-  filename: /tmp/positions.yml
+  filename: /var/lib/promtail/positions.yml
 
 clients:
   - url: http://192.168.1.50:3100/loki/api/v1/push
@@ -15,7 +15,7 @@ scrape_configs:
           - localhost
         labels:
           job: system-logs
-          host: target-vm
+          host: os-linux
           __path__: /var/log/*.log
 
   - job_name: auth-logs
@@ -24,7 +24,7 @@ scrape_configs:
           - localhost
         labels:
           job: auth-logs
-          host: target-vm
+          host: os-linux
           __path__: /var/log/auth.log
 
   - job_name: syslog
@@ -33,7 +33,7 @@ scrape_configs:
           - localhost
         labels:
           job: syslog
-          host: target-vm
+          host: os-linux
           __path__: /var/log/syslog
 
   - job_name: docker-logs
@@ -42,5 +42,5 @@ scrape_configs:
           - localhost
         labels:
           job: docker-logs
-          host: target-vm
+          host: os-linux
           __path__: /var/lib/docker/containers/*/*-json.log

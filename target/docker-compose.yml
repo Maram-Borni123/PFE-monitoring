@@ -37,7 +37,7 @@ services:
     command: -config.file=/etc/promtail/config.yml
     volumes:
       - ./promtail/config.yml:/etc/promtail/config.yml:ro
-      - ./promtail/positions.yml:/tmp/positions.yml
+      - ./promtail:/var/lib/promtail
       - /var/log:/var/log:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /etc/machine-id:/etc/machine-id:ro
