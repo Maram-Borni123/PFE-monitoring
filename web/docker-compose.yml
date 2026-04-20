@@ -1,0 +1,166 @@
+services:
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8082:8082"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - webserver
+
+  apache:
+    image: httpd:2.4
+    container_name: apache
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - ./apache/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+      - apache_logs:/usr/local/apache2/logs
+    networks:
+      - webserver
+
+#  varnish:
+ #   image: varnish:6.0
+  #  container_name: varnish
+   # restart: unless-stopped
+   # ports:
+    #  - "6081:6081"
+   # volumes:
+    #  - ./varnish/default.vcl:/etc/varnish/default.vcl:ro
+   # networks:
+     # - webserver
+#  varnish:
+ #   image: softonic/varnish:latest
+ #   container_name: varnish
+ #   restart: unless-stopped
+ #   ports:
+  #    - "6081:80"
+   #   - "9131:9131"
+   # volumes:
+    #  - ./varnish/default.vcl:/etc/varnish/default.vcl:ro
+   # networks:
+    #  - webserver
+  varnish:
+    image: varnish:7.4
+    container_name: varnish
+    restart: unless-stopped
+    ports:
+      - "6081:80"
+      - "6082:6082"
+    volumes:
+      - ./varnish/default.vcl:/etc/varnish/default.vcl:ro
+      - varnish_lib:/var/lib/varnish
+    networks:
+      - webserver
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - webserver
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - webserver
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    container_name: nginx-exporter
+    restart: unless-stopped
+    ports:
+      - "9113:9113"
+    command:
+      - '-nginx.scrape-uri=http://nginx:8082/stub_status'
+    depends_on:
+      - nginx
+    networks:
+      - webserver
+
+  apache-exporter:
+    image: lusotycoon/apache-exporter:latest
+    container_name: apache-exporter
+    restart: unless-stopped
+    ports:
+      - "9117:9117"
+    command:
+      - '--scrape_uri=http://apache:80/server-status?auto'
+    depends_on:
+      - apache
+    networks:
+      - webserver
+
+ # varnish-exporter:
+  #  image: kyos0109/prometheus-varnish-exporter:latest
+   # container_name: varnish-exporter
+   # restart: unless-stopped
+   # network_mode: "service:varnish"
+   # volumes:
+    #  - varnish_lib:/var/lib/varnish
+   # depends_on:
+    #  - varnish
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    restart: unless-stopped
+    volumes:
+      - ./promtail.yml:/etc/promtail/config.yml:ro
+      - apache_logs:/var/log/apache2:ro
+      - nginx_logs:/var/log/nginx:ro
+      - /var/log:/var/log/host:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - webserver
+
+  varnish-exporter:
+    image: jlcox1970/prometheus-varnish-exporter:7.4.2-1
+    container_name: varnish-exporter
+    restart: unless-stopped
+    depends_on:
+      - varnish
+    ports:
+      - "9131:9131"
+    command:
+      - "-n"
+      - "33213162ce5b"
+    volumes:
+      - varnish_lib:/var/lib/varnish
+    networks:
+      - webserver
+
+networks:
+  webserver:
+
+volumes:
+  nginx_logs:
+  apache_logs:
+  varnish_lib:

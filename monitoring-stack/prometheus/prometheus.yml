@@ -10,4 +10,31 @@ scrape_configs:
     static_configs:
       - targets: ["192.168.1.51:9100"]
         labels:
-          host: "webserver"
+         host: "os-linux"
+
+  - job_name: "target-vm-cadvisor"
+    static_configs:
+      - targets: ["192.168.1.51:8080"]
+        labels:
+          host: "os-linux"
+
+  - job_name: "node-web"
+    static_configs:
+      - targets: ["192.168.1.52:9100"]
+
+  - job_name: "cadvisor-web"
+    static_configs:
+      - targets: ["192.168.1.52:8080"]
+
+  - job_name: "nginx-exporter"
+    static_configs:
+      - targets: ["192.168.1.52:9113"]
+
+  - job_name: "apache-exporter"
+    static_configs:
+      - targets: ["192.168.1.52:9117"]
+
+  - job_name: "varnish"
+    static_configs:
+      - targets: ["192.168.1.52:9131"]
+
