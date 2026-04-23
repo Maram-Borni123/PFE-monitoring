@@ -1,0 +1,99 @@
+networks:
+  nosql_net:
+    driver: bridge
+
+services:
+  redis:
+    image: redis:7
+    container_name: redis
+    command: ["redis-server", "--requirepass", "StrongRedisPass"]
+    networks:
+      - nosql_net
+    restart: unless-stopped
+
+  redis_exporter:
+    image: oliver006/redis_exporter
+    container_name: redis_exporter
+    environment:
+      REDIS_ADDR: redis://:StrongRedisPass@redis:6379
+    ports:
+      - "9121:9121"
+    networks:
+      - nosql_net
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: StrongMongoPass
+    networks:
+      - nosql_net
+    restart: unless-stopped
+
+  mongodb_exporter:
+    image: percona/mongodb_exporter:0.40
+    container_name: mongodb_exporter
+    command:
+      - "--mongodb.uri=mongodb://admin:StrongMongoPass@mongodb:27017/admin"
+    ports:
+      - "9216:9216"
+    networks:
+      - nosql_net
+    restart: unless-stopped
+
+  memcached:
+    image: memcached:latest
+    container_name: memcached
+    networks:
+      - nosql_net
+    restart: unless-stopped
+
+  memcached_exporter:
+    image: prom/memcached-exporter
+    container_name: memcached_exporter
+    command:
+      - "--memcached.address=memcached:11211"
+    ports:
+      - "9150:9150"
+    networks:
+      - nosql_net
+    restart: unless-stopped
+
+  node_exporter:
+    image: prom/node-exporter
+    container_name: node_exporter
+    pid: host
+    network_mode: host
+    volumes:
+      - /:/host:ro,rslave
+    command:
+      - "--path.rootfs=/host"
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+      - /tmp:/tmp
+      - /var/run/docker.sock:/var/run/docker.sock 
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - nosql_net
+    restart: unless-stopped
