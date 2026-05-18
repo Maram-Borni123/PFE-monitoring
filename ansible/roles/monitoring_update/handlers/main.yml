@@ -1,0 +1,5 @@
+---
+- name: Restart Grafana
+  shell: docker compose restart grafana
+  args:
+    chdir: /home/vagrant/monitoring-stack

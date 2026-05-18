@@ -1,0 +1,100 @@
+---
+- name: Ensure VMs are up
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: no
+
+  vars:
+    vagrantfile_dir: "/mnt/c/Users/Maram/projet_PFE"
+    vagrant_bin: "/mnt/c/Program Files/Vagrant/bin/vagrant.exe"
+    vms_to_check:
+      - name: monitoring
+        ip: "10.10.10.50"
+      - name: appscript
+        ip: "10.10.10.56"
+
+  tasks:
+    - name: Check if each VM is reachable (ping)
+      shell: ping -c 1 -W 2 {{ item.ip }}
+      register: ping_results
+      loop: "{{ vms_to_check }}"
+      ignore_errors: yes
+      changed_when: false
+      tags: always
+
+    - name: Show which VMs are down
+      debug:
+        msg: "VM {{ item.item.name }} ({{ item.item.ip }}) is DOWN — starting it"
+      loop: "{{ ping_results.results }}"
+      when: item.rc != 0
+      tags: always
+
+    - name: Show which VMs are up
+      debug:
+        msg: "VM {{ item.item.name }} ({{ item.item.ip }}) is already UP"
+      loop: "{{ ping_results.results }}"
+      when: item.rc == 0
+      tags: always
+
+    - name: Start VMs with vagrant up if unreachable
+      shell: |
+        cd "{{ vagrantfile_dir }}"
+        "{{ vagrant_bin }}" up {{ item.item.name }}
+      loop: "{{ ping_results.results }}"
+      when: item.rc != 0
+      register: vagrant_up_result
+      register: vagrant_up_result
+      tags: always
+    - name: Wait for VMs to be SSH-ready after boot
+      wait_for:
+        host: "{{ item.item.item.ip }}"
+        port: 22
+        timeout: 180
+        state: started
+      loop: "{{ vagrant_up_result.results }}"
+      when: item.changed is defined and item.changed
+      tags: always
+
+    - name: All VMs are up and ready
+      debug:
+        msg: "All 8 VMs are up — proceeding"
+      tags: always
+
+- name: Deploy monitoring agents on appscript
+  hosts: monitored_vms
+  become: yes
+  vars_files:
+    - ../group_vars/all.yml
+
+  pre_tasks:
+    - name: Show deployment target
+      debug:
+        msg: "Starting deployment on {{ inventory_hostname }} ({{ ansible_host }})"
+
+  roles:
+    - role: docker
+      tags: docker
+    - role: appscript_stack
+      tags: appscript_stack
+
+  post_tasks:
+    - name: List running containers
+      shell: docker ps --format "table {{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}\t{{ '{{' }}.Ports{{ '}}' }}"
+      register: docker_ps
+      tags: always
+
+    - name: Show containers
+      debug:
+        msg: "{{ docker_ps.stdout_lines }}"
+      tags: always
+
+- name: Update Prometheus on monitoring server
+  hosts: monitoring_server
+  become: yes
+  vars_files:
+    - ../group_vars/all.yml
+
+  roles:
+    - role: monitoring_update
+      tags: monitoring_update

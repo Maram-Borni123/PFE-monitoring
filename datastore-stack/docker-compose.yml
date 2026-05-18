@@ -1,3 +1,4 @@
+
 networks:
   nosql_net:
     driver: bridge
@@ -6,7 +7,14 @@ services:
   redis:
     image: redis:7
     container_name: redis
-    command: ["redis-server", "--requirepass", "StrongRedisPass"]
+    command:
+      - "redis-server"
+      - "--requirepass"
+      - "StrongRedisPass"
+      - "--loglevel"
+      - "verbose"
+      - "--slowlog-log-slower-than"
+      - "0"
     networks:
       - nosql_net
     restart: unless-stopped
@@ -36,7 +44,8 @@ services:
     image: percona/mongodb_exporter:0.40
     container_name: mongodb_exporter
     command:
-      - "--mongodb.uri=mongodb://admin:StrongMongoPass@mongodb:27017/admin"
+      - "--mongodb.uri=mongodb://exporter:StrongMongoPass@mongodb:27017/admin?authMechanism=SCRAM-SHA-256"
+      - "--collect-all"
     ports:
       - "9216:9216"
     networks:
@@ -46,6 +55,8 @@ services:
   memcached:
     image: memcached:latest
     container_name: memcached
+    command:
+      - "-vv"
     networks:
       - nosql_net
     restart: unless-stopped
@@ -87,6 +98,8 @@ services:
   promtail:
     image: grafana/promtail:latest
     container_name: promtail
+    ports:
+      - "9080:9080"
     volumes:
       - /var/log:/var/log:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro

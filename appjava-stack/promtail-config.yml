@@ -1,0 +1,125 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: debug
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://10.10.10.50:3100/loki/api/v1/push
+
+scrape_configs:
+
+  - job_name: syslog
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: syslog
+          host: appjava
+          __path__: /var/log/syslog
+
+  - job_name: auth
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: auth
+          host: appjava
+          __path__: /var/log/auth.log
+
+  - job_name: kern
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: kern
+          host: appjava
+          __path__: /var/log/kern.log
+
+  - job_name: dpkg
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: dpkg
+          host: appjava
+          __path__: /var/log/dpkg.log
+
+  - job_name: promtail
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["promtail"]
+
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: "/promtail"
+        action: keep
+
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+        regex: "/(.*)"
+        replacement: "$1"
+
+      - replacement: promtail
+        target_label: job
+
+      - replacement: appjava
+        target_label: host
+
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<message>.*)$'
+
+  - job_name: spring_app
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["spring_app"]
+
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: "/spring_app"
+        action: keep
+
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+        regex: "/(.*)"
+        replacement: "$1"
+
+      - replacement: spring_app
+        target_label: job
+
+      - replacement: appjava
+        target_label: host
+
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\S+)\s+(?P<level>INFO|WARN|ERROR|DEBUG)\s+\d+\s+---\s+\[(?P<app>[^\]]+)\]\s+\[(?P<thread>[^\]]+)\]\s+(?P<logger>\S+)\s+:\s+(?P<message>.*)' 
+
+      - labels:
+          level:
+          logger:
+  - job_name: spring_file_logs
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: spring_file
+          host: appjava
+          __path__: /var/log/spring/*.log
+
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\S+)\s+(?P<level>INFO|WARN|ERROR|DEBUG)\s+\d+\s+---\s+\[(?P<app>[^\]]+)\]\s+\[(?P<thread>[^\]]+)\]\s+(?P<logger>\S+)\s+:\s+(?P<message>.*)'
+
+      - labels:
+          level:
+          logger:

@@ -1,0 +1,60 @@
+groups:
+  - name: vm-health
+    rules:
+      - alert: VMDown
+        expr: probe_success == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "VM DOWN: {{ $labels.vm_name }} ({{ $labels.instance }})"
+          description: "VM {{ $labels.vm_name }} ({{ $labels.instance }}) is unreachable."
+
+  - name: node-exporter-health
+    rules:
+      - alert: NodeExporterDown
+        expr:  up{job=~".*node.*"} == 0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node Exporter Down: {{ $labels.vm_name }} ({{ $labels.instance }})"
+          description: "Node exporter is not reachable for more than 5 minutes on {{ $labels.vm_name }}."
+
+  - name: system-resources
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - avg by(instance, vm_name) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100 > 85
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU Usage: {{ $labels.vm_name }} ({{ $labels.instance }})"
+          description: "CPU usage > 85% for 5 minutes on {{ $labels.vm_name }} ({{ $labels.instance }})."
+
+      - alert: CriticalCPUUsage
+        expr: 100 - avg by(instance, vm_name) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100 > 95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical CPU Usage: {{ $labels.vm_name }} ({{ $labels.instance }})"
+          description: "CPU usage > 95% for 1 minute on {{ $labels.vm_name }} ({{ $labels.instance }})."
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High Memory Usage: {{ $labels.vm_name }} ({{ $labels.instance }})"
+          description: "Memory usage > 90% for 5 minutes on {{ $labels.vm_name }} ({{ $labels.instance }})."
+
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes) * 100 < 15
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low Disk Space: {{ $labels.vm_name }} ({{ $labels.instance }})"
+          description: "Disk space < 15% on {{ $labels.mountpoint }} — {{ $labels.vm_name }} ({{ $labels.instance }})."

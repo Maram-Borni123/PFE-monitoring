@@ -1,0 +1,15 @@
+loki_url: "http://10.10.10.50:3100"
+prometheus_url: "http://10.10.10.50:9090"
+
+node_exporter_port: 9100
+cadvisor_port: 8080
+promtail_port: 9080
+
+prometheus_config_path: "/home/vagrant/monitoring-stack/prometheus/prometheus.yml"
+monitoring_dir: "/opt/monitoring"
+
+node_exporter_image: "prom/node-exporter:latest"
+cadvisor_image: "gcr.io/cadvisor/cadvisor:latest"
+promtail_image: "grafana/promtail:latest"
+
+appscript_ip: "10.10.10.56"

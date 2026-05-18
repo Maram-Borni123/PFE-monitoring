@@ -70,9 +70,9 @@ Vagrant.configure("2") do |config|
     end
   end
   #vm8
-  config.vm.define "infra" do |inf|
+  config.vm.define "application-services" do |inf|
     inf.vm.box = "ubuntu/jammy64"
-    inf.vm.hostname = "infra"
+    inf.vm.hostname = "application-services"
     inf.vm.network "private_network", ip: "10.10.10.57"
     inf.vm.provider "virtualbox" do |vb|
       vb.memory = 2048 

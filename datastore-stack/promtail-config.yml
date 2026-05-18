@@ -1,7 +1,7 @@
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
-
+  log_level: warn
 positions:
   filename: /tmp/positions.yaml
 
@@ -9,82 +9,135 @@ clients:
   - url: http://10.10.10.50:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: system
-    static_configs:
-      - targets: [localhost]
-        labels:
-          job: system
-          host: nosql-vm
-          __path__: /var/log/*.log
 
-  - job_name: docker
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          host: nosql
+          __path__: /var/log/syslog
+
+  - job_name: auth
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: auth
+          host: nosql
+          __path__: /var/log/auth.log
+
+  - job_name: kern
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: kern
+          host: nosql
+          __path__: /var/log/kern.log
+
+  - job_name: dpkg
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: dpkg
+          host: nosql
+          __path__: /var/log/dpkg.log
+
+  - job_name: mongodb
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["mongodb"]
     relabel_configs:
       - source_labels: [__meta_docker_container_name]
-        regex: '/(.*)'
+        regex: "/mongodb"
+        action: keep
+      - source_labels: [__meta_docker_container_name]
         target_label: container
-      - source_labels: [__meta_docker_container_image]
-        target_label: image
-      - target_label: job
-        replacement: docker
-      - source_labels: [__meta_docker_container_name]
-        regex: '/redis$'
-        action: replace
-        target_label: service
-        replacement: redis
-      - source_labels: [__meta_docker_container_name]
-        regex: '/memcached$'
-        action: replace
-        target_label: service
-        replacement: memcached
-      - source_labels: [__meta_docker_container_name]
-        regex: '/mongodb$'
-        action: replace
-        target_label: service
-        replacement: mongodb
-      - source_labels: [__meta_docker_container_name]
-        regex: '/redis_exporter$'
-        action: replace
-        target_label: service
-        replacement: redis_exporter
-      - source_labels: [__meta_docker_container_name]
-        regex: '/memcached_exporter$'
-        action: replace
-        target_label: service
-        replacement: memcached_exporter
-      - source_labels: [__meta_docker_container_name]
-        regex: '/mongodb_exporter$'
-        action: replace
-        target_label: service
-        replacement: mongodb_exporter
-      - source_labels: [__meta_docker_container_name]
-        regex: '/node_exporter$'
-        action: replace
-        target_label: service
-        replacement: node_exporter
-      - source_labels: [__meta_docker_container_name]
-        regex: '/cadvisor$'
-        action: replace
-        target_label: service
-        replacement: cadvisor
-      - source_labels: [__meta_docker_container_name]
-        regex: '/promtail$'
-        action: replace
-        target_label: service
-        replacement: promtail
-      - source_labels: [service]
-        regex: '^$'
-        action: replace
-        target_label: service
-        replacement: unknown
+        regex: "/(.*)"
+        replacement: "$1"
+      - replacement: mongodb
+        target_label: job
+      - replacement: nosql
+        target_label: host
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
     pipeline_stages:
       - docker: {}
-      - regex:
-          expression: '(?P<level>INFO|WARN|ERROR|DEBUG)'
-      - labels:
-          level:
-          container:
-          service:
-          image:
+
+  - job_name: redis
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["redis"]
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: "/redis"
+        action: keep
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+        regex: "/(.*)"
+        replacement: "$1"
+      - replacement: redis
+        target_label: job
+      - replacement: nosql
+        target_label: host
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+    pipeline_stages:
+      - docker: {}
+
+  - job_name: memcached
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["memcached"]
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: "/memcached"
+        action: keep
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+        regex: "/(.*)"
+        replacement: "$1"
+      - replacement: memcached
+        target_label: job
+      - replacement: nosql
+        target_label: host
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+    pipeline_stages:
+      - docker: {}
+
+  - job_name: promtail
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["promtail"]
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: "/promtail"
+        action: keep
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+        regex: "/(.*)"
+        replacement: "$1"
+      - replacement: promtail
+        target_label: job
+      - replacement: nosql
+        target_label: host
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+    pipeline_stages:
+      - docker: {}

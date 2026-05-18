@@ -1,0 +1,195 @@
+networks:
+  app-services-net:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+  elasticsearch_data:
+  ftpd_data:
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: rabbitmq
+    hostname: rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - app-services-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  elasticsearch:
+    image: elasticsearch:8.12.0
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - cluster.name=es-monitoring-cluster
+      - node.name=es-node-01
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - app-services-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -qE 'green|yellow'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+  ftpd:
+    image: delfer/alpine-ftp-server
+    container_name: ftpd
+    restart: unless-stopped
+    environment:
+      - USERS=ftpuser|ftp123|/home/ftpuser|1000
+      - ADDRESS=10.10.10.57
+      - MIN_PORT=30000
+      - MAX_PORT=30009
+    ports:
+      - "21:21"
+      - "30000-30009:30000-30009"
+    volumes:
+      - ftpd_data:/home/ftpuser
+      - ./ftpd-logs:/var/log/vsftpd
+    networks:
+      - app-services-net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "21"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+  rabbitmq_exporter:
+    image: kbudde/rabbitmq-exporter:latest
+    container_name: rabbitmq_exporter
+    restart: unless-stopped
+    environment:
+      RABBIT_URL: "http://rabbitmq:15672"
+      RABBIT_USER: admin
+      RABBIT_PASSWORD: admin123
+      PUBLISH_PORT: "9419"
+      LOG_LEVEL: info
+    ports:
+      - "9419:9419"
+    networks:
+      - app-services-net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  elasticsearch_exporter:
+    image: prometheuscommunity/elasticsearch-exporter:latest
+    container_name: elasticsearch_exporter
+    restart: unless-stopped
+    command:
+      - "--es.uri=http://elasticsearch:9200"
+      - "--es.all"
+      - "--es.indices"
+      - "--es.shards"
+      - "--web.listen-address=:9114"
+      - "--web.telemetry-path=/metrics"
+    ports:
+      - "9114:9114"
+    networks:
+      - app-services-net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  ftpd_exporter:
+    image: python:3.11-alpine
+    container_name: ftpd_exporter
+    restart: unless-stopped
+    environment:
+      FTP_HOST: ftpd
+      FTP_PORT: "21"
+      FTP_USER: ftpuser
+      FTP_PASS: ftp123
+      LISTEN_PORT: "9144"
+    ports:
+      - "9144:9144"
+    volumes:
+      - ./ftpd_exporter.py:/app/ftpd_exporter.py:ro
+    command: python /app/ftpd_exporter.py
+    networks:
+      - app-services-net
+    depends_on:
+      - ftpd
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: node_exporter
+    restart: unless-stopped
+    command:
+      - "--path.rootfs=/host"
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+      - "--web.listen-address=:9100"
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host:ro,rslave
+    pid: host
+    networks:
+      - app-services-net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: cadvisor
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - app-services-net
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    restart: unless-stopped
+    command:
+      - "-config.file=/etc/promtail/promtail.yml"
+    ports:
+      - "9080:9080"
+    volumes:
+      - /var/lib/rabbitmq:/var/lib/rabbitmq:ro
+      - ./promtail.yml:/etc/promtail/promtail.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - app-services-net

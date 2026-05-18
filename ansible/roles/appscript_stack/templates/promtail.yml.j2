@@ -1,0 +1,41 @@
+server:
+  http_listen_port: {{ promtail_port }}
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: {{ loki_url }}/loki/api/v1/push
+
+scrape_configs:
+
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: varlogs
+          host: {{ inventory_hostname }}
+          vm_name: "{{ inventory_hostname }}"
+          __path__: /var/log/syslog
+
+  - job_name: auth
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: auth
+          host: {{ inventory_hostname }}
+          vm_name: "{{ inventory_hostname }}"
+          __path__: /var/log/auth.log
+
+  - job_name: kern
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: kern
+          host: {{ inventory_hostname }}
+          vm_name: "{{ inventory_hostname }}"
+          __path__: /var/log/kern.log

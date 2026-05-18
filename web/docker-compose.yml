@@ -9,7 +9,6 @@ services:
       - "8082:8082"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - nginx_logs:/var/log/nginx
     networks:
       - webserver
 
@@ -21,35 +20,21 @@ services:
       - "8081:80"
     volumes:
       - ./apache/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
-      - apache_logs:/usr/local/apache2/logs
     networks:
       - webserver
 
-#  varnish:
- #   image: varnish:6.0
-  #  container_name: varnish
-   # restart: unless-stopped
-   # ports:
-    #  - "6081:6081"
-   # volumes:
-    #  - ./varnish/default.vcl:/etc/varnish/default.vcl:ro
-   # networks:
-     # - webserver
-#  varnish:
- #   image: softonic/varnish:latest
- #   container_name: varnish
- #   restart: unless-stopped
- #   ports:
-  #    - "6081:80"
-   #   - "9131:9131"
-   # volumes:
-    #  - ./varnish/default.vcl:/etc/varnish/default.vcl:ro
-   # networks:
-    #  - webserver
   varnish:
     image: varnish:7.4
     container_name: varnish
     restart: unless-stopped
+    labels:
+      - "promtail=true"
+    command: >
+      varnishd -F
+      -a :80
+      -T localhost:6082
+      -f /etc/varnish/default.vcl
+      -n varnish
     ports:
       - "6081:80"
       - "6082:6082"
@@ -73,6 +58,7 @@ services:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|vboxsf)$$'
     networks:
       - webserver
 
@@ -118,25 +104,19 @@ services:
     networks:
       - webserver
 
- # varnish-exporter:
-  #  image: kyos0109/prometheus-varnish-exporter:latest
-   # container_name: varnish-exporter
-   # restart: unless-stopped
-   # network_mode: "service:varnish"
-   # volumes:
-    #  - varnish_lib:/var/lib/varnish
-   # depends_on:
-    #  - varnish
-
   promtail:
     image: grafana/promtail:latest
     container_name: promtail
     restart: unless-stopped
+    ports:
+      - "9080:9080"
     volumes:
-      - ./promtail.yml:/etc/promtail/config.yml:ro
-      - apache_logs:/var/log/apache2:ro
-      - nginx_logs:/var/log/nginx:ro
+      - varnish_logs:/var/log/varnish:ro
+      - ./promtail/promtail.yml:/etc/promtail/config.yml:ro
+      - ./promtail:/var/lib/promtail
       - /var/log:/var/log/host:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro  # ← manquait
     command: -config.file=/etc/promtail/config.yml
     networks:
       - webserver
@@ -145,22 +125,36 @@ services:
     image: jlcox1970/prometheus-varnish-exporter:7.4.2-1
     container_name: varnish-exporter
     restart: unless-stopped
+    user: "0:1000"
     depends_on:
       - varnish
     ports:
       - "9131:9131"
     command:
       - "-n"
-      - "33213162ce5b"
+      - "/var/lib/varnish/varnish"
     volumes:
       - varnish_lib:/var/lib/varnish
     networks:
       - webserver
-
+  varnish-logger:
+    image: varnish:7.4
+    container_name: varnish-logger
+    restart: unless-stopped
+    user: varnish
+    command: >
+      varnishncsa -n /var/lib/varnish/varnish
+      -a -w /var/log/varnish/access.log
+    volumes:
+      - varnish_lib:/var/lib/varnish
+      - varnish_logs:/var/log/varnish
+    depends_on:
+      - varnish
+    networks:
+      - webserver
 networks:
   webserver:
 
 volumes:
-  nginx_logs:
-  apache_logs:
   varnish_lib:
+  varnish_logs:

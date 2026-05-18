@@ -1,0 +1,236 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+
+scrape_configs:
+  - job_name: "prometheus"
+    metrics_path: /prometheus/metrics    
+    static_configs:
+      - targets: ["prometheus:9090"]
+        labels:
+          vm_name: "MonitoringServer"
+
+  - job_name: "target-vm-node-exporter"
+    static_configs:
+      - targets: ["10.10.10.51:9100"]
+        labels:
+          host: "os-linux"
+          vm_name: "os-linux"
+
+  - job_name: "target-vm-cadvisor"
+    static_configs:
+      - targets: ["10.10.10.51:8080"]
+        labels:
+          host: "os-linux"
+          vm_name: "os-linux"
+
+  - job_name: "node-web"
+    static_configs:
+      - targets: ["10.10.10.52:9100"]
+        labels:
+          vm_name: "webserver"
+
+  - job_name: "cadvisor-web"
+    static_configs:
+      - targets: ["10.10.10.52:8080"]
+        labels:
+          vm_name: "webserver"
+
+  - job_name: "nginx-exporter"
+    static_configs:
+      - targets: ["10.10.10.52:9113"]
+        labels:
+          vm_name: "webserver"
+
+  - job_name: "apache-exporter"
+    static_configs:
+      - targets: ["10.10.10.52:9117"]
+        labels:
+          vm_name: "webserver"
+
+  - job_name: "varnish"
+    static_configs:
+      - targets: ["10.10.10.52:9131"]
+        labels:
+          vm_name: "webserver"
+
+  - job_name: "database-node"
+    static_configs:
+      - targets: ["10.10.10.53:9100"]
+        labels:
+          vm_name: "database"
+
+  - job_name: "database-cadvisor"
+    static_configs:
+      - targets: ["10.10.10.53:8081"]
+        labels:
+          vm_name: "database"
+
+  - job_name: "mariadb"
+    static_configs:
+      - targets: ["10.10.10.53:9104"]
+        labels:
+          vm_name: "database"
+
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["10.10.10.53:9187"]
+        labels:
+          vm_name: "database"
+
+  - job_name: 'nosql-node'
+    static_configs:
+      - targets: ['10.10.10.54:9100']
+        labels:
+          vm_name: "nosql-cache"
+
+  - job_name: 'nosql-cadvisor'
+    static_configs:
+      - targets: ['10.10.10.54:8080']
+        labels:
+          vm_name: "nosql-cache"
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['10.10.10.54:9121']
+        labels:
+          vm_name: "nosql-cache"
+
+  - job_name: 'memcached'
+    static_configs:
+      - targets: ['10.10.10.54:9150']
+        labels:
+          vm_name: "nosql-cache"
+
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: ['10.10.10.54:9216']
+        labels:
+          vm_name: "nosql-cache"
+
+  - job_name: "spring-app"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["10.10.10.55:8080"]
+        labels:
+          vm_name: "appjava"
+
+  - job_name: "spring-node-exporter"
+    static_configs:
+      - targets: ["10.10.10.55:9100"]
+        labels:
+          vm_name: "appjava"
+
+  - job_name: "spring-cadvisor"
+    static_configs:
+      - targets: ["10.10.10.55:8081"]
+        labels:
+          vm_name: "appjava"
+
+  - job_name: 'application-services-node'
+    static_configs:
+      - targets: ['10.10.10.57:9100']
+        labels:
+          vm_name: "application-services"
+
+  - job_name: 'application-services-cadvisor'
+    static_configs:
+      - targets: ['10.10.10.57:8080']
+        labels:
+          vm_name: "application-services"
+
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['10.10.10.57:9419']
+        labels:
+          vm_name: "application-services"
+
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['10.10.10.57:9114']
+        labels:
+          vm_name: "application-services"
+
+  - job_name: 'ftpd'
+    static_configs:
+      - targets: ['10.10.10.57:9144']
+        labels:
+          vm_name: "application-services"
+
+  # BEGIN ANSIBLE MANAGED - appscript
+  - job_name: "appscript-node"
+    static_configs:
+      - targets: ["10.10.10.56:9100"]
+        labels:
+          vm_name: "appscript"
+
+  - job_name: "appscript-cadvisor"
+    static_configs:
+      - targets: ["10.10.10.56:8080"]
+        labels:
+          vm_name: "appscript"
+  # END ANSIBLE MANAGED - appscript
+  - job_name: "vm-ping"
+    metrics_path: /probe
+    params:
+      module: [icmp]
+
+    static_configs:
+      - targets:
+          - 10.10.10.51
+          - 10.10.10.52
+          - 10.10.10.53
+          - 10.10.10.54
+          - 10.10.10.55
+          - 10.10.10.56
+          - 10.10.10.57
+
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+
+      - source_labels: [__param_target]
+        target_label: instance
+
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+      - source_labels: [__param_target]
+        regex: 10.10.10.51
+        target_label: vm_name
+        replacement: os-linux
+
+      - source_labels: [__param_target]
+        regex: 10.10.10.52
+        target_label: vm_name
+        replacement: webserver
+
+      - source_labels: [__param_target]
+        regex: 10.10.10.53
+        target_label: vm_name
+        replacement: database
+
+      - source_labels: [__param_target]
+        regex: 10.10.10.54
+        target_label: vm_name
+        replacement: nosql-cache
+
+      - source_labels: [__param_target]
+        regex: 10.10.10.55
+        target_label: vm_name
+        replacement: appjava
+
+      - source_labels: [__param_target]
+        regex: 10.10.10.56
+        target_label: vm_name
+        replacement: appscript
+
+      - source_labels: [__param_target]
+        regex: 10.10.10.57
+        target_label: vm_name
+        replacement: application-services

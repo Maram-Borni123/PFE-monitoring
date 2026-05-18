@@ -1,0 +1,171 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://10.10.10.50:3100/loki/api/v1/push
+
+scrape_configs:
+
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          host: application-services
+          __path__: /var/log/syslog
+
+  - job_name: auth
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: auth
+          host: application-services
+          __path__: /var/log/auth.log
+
+  - job_name: kern
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: kern
+          host: application-services
+          __path__: /var/log/kern.log
+
+  - job_name: dpkg
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: dpkg
+          host: application-services
+          __path__: /var/log/dpkg.log
+
+  - job_name: rabbitmq
+
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["rabbitmq"]
+
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: "/rabbitmq"
+        action: keep
+
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+        regex: "/(.*)"
+        replacement: "$1"
+
+      - replacement: rabbitmq
+        target_label: job
+
+      - replacement: application-services
+        target_label: host
+
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+
+    pipeline_stages:
+      - docker: {}
+
+  - job_name: elasticsearch
+
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["elasticsearch"]
+
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: "/elasticsearch"
+        action: keep
+
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+        regex: "/(.*)"
+        replacement: "$1"
+
+      - replacement: elasticsearch
+        target_label: job
+
+      - replacement: application-services
+        target_label: host
+
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+
+    pipeline_stages:
+      - docker: {}
+
+  - job_name: promtail
+
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["promtail"]
+
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: "/promtail"
+        action: keep
+
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+        regex: "/(.*)"
+        replacement: "$1"
+
+      - replacement: promtail
+        target_label: job
+
+      - replacement: application-services
+        target_label: host
+
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+
+    pipeline_stages:
+      - docker: {}
+
+  - job_name: ftpd
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["ftpd"]
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: "/ftpd"
+        action: keep
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+        regex: "/(.*)"
+        replacement: "$1"
+      - replacement: ftpd
+        target_label: job
+      - replacement: application-services
+        target_label: host
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+    pipeline_stages:
+      - docker: {}
+  - job_name: rabbitmq_tracing
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: rabbitmq-tracing
+          host: application-services
+          __path__: /var/lib/rabbitmq/**/*.log

@@ -1,0 +1,146 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yml
+
+clients:
+  - url: http://10.10.10.50:3100/loki/api/v1/push
+
+scrape_configs:
+
+  - job_name: system_syslog
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: syslog
+          host: webserver
+          __path__: /var/log/host/syslog
+
+  - job_name: system_auth
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: auth
+          host: webserver
+          __path__: /var/log/host/auth.log
+
+  - job_name: system_kern
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: kernel
+          host: webserver
+          __path__: /var/log/host/kern.log
+
+  - job_name: system_dpkg
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: dpkg
+          host: webserver
+          __path__: /var/log/host/dpkg.log
+
+  - job_name: system_cron
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: cron
+          host: webserver
+          __path__: /var/log/host/{cron,cron.log}
+
+  - job_name: nginx
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["nginx"]
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: "/nginx"
+        action: keep
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+        regex: "/(.*)"
+        replacement: "$1"
+      - replacement: nginx
+        target_label: job
+      - replacement: webserver
+        target_label: host
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<remote_addr>\S+) - .* "(?P<method>\S+) (?P<path>\S+) .*" (?P<status>\d+) (?P<size>\d+)'
+      - labels:
+          method:
+          status:
+
+  - job_name: apache
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["apache"]
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: "/apache"
+        action: keep
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+        regex: "/(.*)"
+        replacement: "$1"
+      - replacement: apache
+        target_label: job
+      - replacement: webserver
+        target_label: host
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<ip>\S+) .* "(?P<method>\S+) (?P<path>\S+) HTTP/\S+" (?P<status>\d+) (?P<size>\d+)'
+      - labels:
+          method:
+          status:
+
+  - job_name: varnish
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["varnish"]
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+        regex: "/(.*)"
+        replacement: "$1"
+
+      - replacement: varnish
+        target_label: job
+      - replacement: webserver
+        target_label: host
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
+
+    pipeline_stages:
+      - docker: {}
+
+  - job_name: varnish_access
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: varnish_access
+          host: webserver
+          __path__: /var/log/varnish/access.log
+
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<remote_addr>\S+) - .* "(?P<method>\S+) (?P<path>\S+) .*" (?P<status>\d+) (?P<size>\d+)'
+
+      - labels:
+          method:
+          status:

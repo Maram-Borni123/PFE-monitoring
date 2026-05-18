@@ -4,17 +4,17 @@ server:
   http_listen_port: 3100
   grpc_listen_port: 9096
 
+analytics:
+  reporting_enabled: false
+
 common:
   instance_addr: 127.0.0.1
   path_prefix: /loki
-
   storage:
     filesystem:
       chunks_directory: /loki/chunks
       rules_directory: /loki/rules
-
   replication_factor: 1
-
   ring:
     kvstore:
       store: inmemory
@@ -43,6 +43,20 @@ limits_config:
   ingestion_burst_size_mb: 32
   allow_structured_metadata: false
   volume_enabled: true
+  retention_period: 744h
+
+ingester:
+  wal:
+    enabled: true
+    dir: /loki/wal
+
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
+  delete_request_store: filesystem
 
 ruler:
-  alertmanager_url: http://localhost:9093
+  alertmanager_url: http://alertmanager:9093

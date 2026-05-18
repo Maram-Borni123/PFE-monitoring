@@ -1,0 +1,52 @@
+---
+- name: Check if appscript jobs already exist
+  shell: grep -c "appscript-node" {{ prometheus_config_path }} || true
+  register: job_exists
+  changed_when: false
+
+- name: Add appscript scrape jobs to prometheus.yml
+  blockinfile:
+    path: "{{ prometheus_config_path }}"
+    insertbefore: "- job_name: \"vm-ping\""
+    marker: "  # {mark} ANSIBLE MANAGED - appscript"
+    block: |2
+        - job_name: "appscript-node"
+          static_configs:
+            - targets: ["{{ appscript_ip }}:{{ node_exporter_port }}"]
+              labels:
+                vm_name: "appscript"
+
+        - job_name: "appscript-cadvisor"
+          static_configs:
+            - targets: ["{{ appscript_ip }}:{{ cadvisor_port }}"]
+              labels:
+                vm_name: "appscript"
+  when: job_exists.stdout == "0"
+
+- name: Validate prometheus.yml YAML syntax
+  shell: python3 -c "import yaml; yaml.safe_load(open('{{ prometheus_config_path }}'))"
+  register: yaml_check
+  changed_when: false
+
+- name: Show YAML validation result
+  debug:
+    msg: "prometheus.yml syntax is VALID"
+  when: yaml_check.rc == 0
+
+- name: Reload Prometheus via API
+  uri:
+    url: "{{ prometheus_url }}/-/reload"
+    method: POST
+    status_code: 200
+  when: job_exists.stdout == "0"
+
+- name: Confirm reload
+  debug:
+    msg: "Prometheus reloaded — appscript targets are now active"
+  when: job_exists.stdout == "0"
+
+- name: Already configured message
+  debug:
+    msg: "appscript jobs already present in prometheus.yml — skipping"
+  when: job_exists.stdout != "0"
+
