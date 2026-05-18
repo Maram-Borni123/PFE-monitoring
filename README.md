@@ -25,7 +25,6 @@ La solution permet de :
 - Blackbox Exporter
 - Node Exporter
 - cAdvisor
-- Trivy
 
 ## Architecture de la solution
 
